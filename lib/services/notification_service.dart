@@ -26,6 +26,7 @@ class NotificationService {
   );
 
   Future<void> init() async {
+    if (kIsWeb) return;
     try {
       tzdata.initializeTimeZones();
       tz.setLocalLocation(_detectLocation());

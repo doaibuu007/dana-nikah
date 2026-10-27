@@ -318,8 +318,7 @@ class AppState extends ChangeNotifier {
           'Pindahkan atau hapus datanya dulu.';
     }
     await _db.delete('categories', id);
-    await _db.execute(
-        'UPDATE tasks SET category_id = NULL WHERE category_id = ?', [id]);
+    await _db.clearTaskCategory(id);
     await _afterChange();
     return null;
   }
@@ -358,8 +357,7 @@ class AppState extends ChangeNotifier {
   /// Riwayat pembayaran tetap disimpan (vendor_id dikosongkan).
   Future<void> deleteVendor(int id) async {
     await _db.delete('vendors', id);
-    await _db.execute(
-        'UPDATE payments SET vendor_id = NULL WHERE vendor_id = ?', [id]);
+    await _db.clearPaymentVendor(id);
     await _afterChange();
   }
 

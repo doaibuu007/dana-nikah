@@ -259,6 +259,36 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _showIphoneGuide(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cara Pasang di iPhone (iOS)'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '1. Buka link Web aplikasi Dana Nikah melalui browser Safari di iPhone.\n\n'
+              '2. Ketuk tombol Share / Bagikan (ikon kotak dengan panah ke atas) di bagian bawah Safari.\n\n'
+              '3. Geser ke bawah lalu pilih "Add to Home Screen" (Tambahkan ke Layar Utama) ➔ ketuk Add (Tambah).\n\n'
+              '4. Ikon Dana Nikah akan muncul di layar utama iPhone dan berjalan layar penuh seperti aplikasi asli.\n\n'
+              '💡 Tips Sinkronisasi Android ↔ iPhone:\n'
+              'Gunakan menu "Backup Data (Kirim WA)" di HP pertama, lalu "Restore Data" di HP kedua untuk menyamakan data.',
+              style: TextStyle(fontSize: 13.5, height: 1.45),
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Mengerti'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _reset(BuildContext context, AppState s) async {
     final ok = await confirmDialog(
       context,
@@ -448,6 +478,15 @@ class SettingsScreen extends StatelessWidget {
                     buildCsvExport(s),
                     'Data CSV disalin! Tempel ke Excel / Google Sheets.',
                   ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.phone_iphone, color: AppColors.rose),
+                  title: const Text('Cara Pasang di iPhone (iOS)'),
+                  subtitle: const Text(
+                      'Panduan install Web App ke Home Screen Safari iPhone'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showIphoneGuide(context),
                 ),
                 const Divider(height: 1),
                 ListTile(
