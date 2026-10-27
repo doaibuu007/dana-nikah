@@ -9,6 +9,7 @@ extension VendorStatusLabel on VendorStatus {
 }
 
 const List<String> paymentTypes = ['DP', 'Cicilan', 'Pelunasan', 'Lainnya'];
+const List<String> seserahanTypes = ['Seserahan', 'Mahar'];
 
 int? _writeDate(DateTime? d) => d?.millisecondsSinceEpoch;
 DateTime? _readDate(Object? v) =>
@@ -27,6 +28,14 @@ class WeddingProfile {
     this.savingReminderHour = 19,
     this.savingReminderMinute = 0,
     this.dueReminderEnabled = true,
+    this.invitationCount = 250,
+    this.guestsPerInvite = 2,
+    this.extraFamilyGuests = 50,
+    this.guestBufferPercent = 10,
+    this.buffetPercent = 60,
+    this.buffetPrice = 75000,
+    this.stallPrice = 25000,
+    this.stallMultiplier = 3,
   });
 
   static const WeddingProfile empty = WeddingProfile();
@@ -41,6 +50,16 @@ class WeddingProfile {
   final int savingReminderHour;
   final int savingReminderMinute;
   final bool dueReminderEnabled;
+
+  // Parameter kalkulator tamu & katering
+  final int invitationCount;
+  final int guestsPerInvite;
+  final int extraFamilyGuests;
+  final int guestBufferPercent;
+  final int buffetPercent;
+  final int buffetPrice;
+  final int stallPrice;
+  final int stallMultiplier;
 
   String get coupleName {
     final a = partner1.trim();
@@ -63,6 +82,14 @@ class WeddingProfile {
     int? savingReminderHour,
     int? savingReminderMinute,
     bool? dueReminderEnabled,
+    int? invitationCount,
+    int? guestsPerInvite,
+    int? extraFamilyGuests,
+    int? guestBufferPercent,
+    int? buffetPercent,
+    int? buffetPrice,
+    int? stallPrice,
+    int? stallMultiplier,
   }) {
     return WeddingProfile(
       partner1: partner1 ?? this.partner1,
@@ -76,6 +103,14 @@ class WeddingProfile {
       savingReminderHour: savingReminderHour ?? this.savingReminderHour,
       savingReminderMinute: savingReminderMinute ?? this.savingReminderMinute,
       dueReminderEnabled: dueReminderEnabled ?? this.dueReminderEnabled,
+      invitationCount: invitationCount ?? this.invitationCount,
+      guestsPerInvite: guestsPerInvite ?? this.guestsPerInvite,
+      extraFamilyGuests: extraFamilyGuests ?? this.extraFamilyGuests,
+      guestBufferPercent: guestBufferPercent ?? this.guestBufferPercent,
+      buffetPercent: buffetPercent ?? this.buffetPercent,
+      buffetPrice: buffetPrice ?? this.buffetPrice,
+      stallPrice: stallPrice ?? this.stallPrice,
+      stallMultiplier: stallMultiplier ?? this.stallMultiplier,
     );
   }
 
@@ -90,6 +125,14 @@ class WeddingProfile {
         'saving_reminder_hour': savingReminderHour.toString(),
         'saving_reminder_minute': savingReminderMinute.toString(),
         'due_reminder_enabled': dueReminderEnabled ? '1' : '0',
+        'invitation_count': invitationCount.toString(),
+        'guests_per_invite': guestsPerInvite.toString(),
+        'extra_family_guests': extraFamilyGuests.toString(),
+        'guest_buffer_percent': guestBufferPercent.toString(),
+        'buffet_percent': buffetPercent.toString(),
+        'buffet_price': buffetPrice.toString(),
+        'stall_price': stallPrice.toString(),
+        'stall_multiplier': stallMultiplier.toString(),
       };
 
   factory WeddingProfile.fromSettings(Map<String, String> s) {
@@ -115,6 +158,14 @@ class WeddingProfile {
       savingReminderHour: readInt('saving_reminder_hour', 19),
       savingReminderMinute: readInt('saving_reminder_minute', 0),
       dueReminderEnabled: readBool('due_reminder_enabled', true),
+      invitationCount: readInt('invitation_count', 250),
+      guestsPerInvite: readInt('guests_per_invite', 2),
+      extraFamilyGuests: readInt('extra_family_guests', 50),
+      guestBufferPercent: readInt('guest_buffer_percent', 10),
+      buffetPercent: readInt('buffet_percent', 60),
+      buffetPrice: readInt('buffet_price', 75000),
+      stallPrice: readInt('stall_price', 25000),
+      stallMultiplier: readInt('stall_multiplier', 3),
     );
   }
 }
@@ -158,6 +209,20 @@ class BudgetCategory {
   final String iconKey;
   final int budget;
   final int sortOrder;
+
+  BudgetCategory copyWith({
+    String? name,
+    String? iconKey,
+    int? budget,
+    int? sortOrder,
+  }) =>
+      BudgetCategory(
+        id: id,
+        name: name ?? this.name,
+        iconKey: iconKey ?? this.iconKey,
+        budget: budget ?? this.budget,
+        sortOrder: sortOrder ?? this.sortOrder,
+      );
 
   Map<String, Object?> toMap() => {
         'id': id,
@@ -335,6 +400,67 @@ class TaskItem {
         done: (m['done'] as int?) == 1,
         dueDate: _readDate(m['due_date']),
         categoryId: m['category_id'] as int?,
+        note: (m['note'] as String?) ?? '',
+      );
+}
+
+/// Item rincian barang Seserahan & Mahar.
+class SeserahanItem {
+  const SeserahanItem({
+    this.id,
+    required this.name,
+    this.itemType = 'Seserahan',
+    this.estimatedPrice = 0,
+    this.actualPrice = 0,
+    this.bought = false,
+    this.note = '',
+  });
+
+  final int? id;
+  final String name;
+
+  /// 'Seserahan' atau 'Mahar'
+  final String itemType;
+  final int estimatedPrice;
+  final int actualPrice;
+  final bool bought;
+  final String note;
+
+  SeserahanItem copyWith({
+    String? name,
+    String? itemType,
+    int? estimatedPrice,
+    int? actualPrice,
+    bool? bought,
+    String? note,
+  }) =>
+      SeserahanItem(
+        id: id,
+        name: name ?? this.name,
+        itemType: itemType ?? this.itemType,
+        estimatedPrice: estimatedPrice ?? this.estimatedPrice,
+        actualPrice: actualPrice ?? this.actualPrice,
+        bought: bought ?? this.bought,
+        note: note ?? this.note,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'name': name,
+        'item_type': itemType,
+        'estimated_price': estimatedPrice,
+        'actual_price': actualPrice,
+        'bought': bought ? 1 : 0,
+        'note': note,
+      };
+
+  factory SeserahanItem.fromMap(Map<String, Object?> m) => SeserahanItem(
+        id: m['id'] as int,
+        name: m['name'] as String,
+        itemType: (m['item_type'] as String?) ?? 'Seserahan',
+        estimatedPrice: (m['estimated_price'] as int?) ?? 0,
+        actualPrice: (m['actual_price'] as int?) ?? 0,
+        bought: (m['bought'] as int?) == 1,
         note: (m['note'] as String?) ?? '',
       );
 }

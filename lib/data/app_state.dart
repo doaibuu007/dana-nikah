@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,21 @@ import '../models/models.dart';
 import '../services/notification_service.dart';
 import '../utils/format.dart';
 import 'database.dart';
+
+/// Bobot persentase rekomendasi alokasi anggaran per icon_key kategori.
+const Map<String, int> defaultCategoryWeights = {
+  'catering': 35,
+  'venue': 15,
+  'decor': 10,
+  'makeup': 10,
+  'camera': 7,
+  'ring': 5,
+  'gift': 5,
+  'mail': 5,
+  'music': 3,
+  'other': 3,
+  'document': 2,
+};
 
 /// State utama aplikasi: memuat data dari database, menyediakan
 /// perhitungan ringkasan, dan menjadwalkan ulang pengingat.
@@ -22,6 +38,7 @@ class AppState extends ChangeNotifier {
   List<Vendor> vendors = [];
   List<Payment> payments = [];
   List<TaskItem> tasks = [];
+  List<SeserahanItem> seserahanItems = [];
 
   // ---------------------------------------------------------------------------
   // Loading
@@ -52,6 +69,9 @@ class AppState extends ChangeNotifier {
         .toList();
     tasks = (await _db.queryAll('tasks', orderBy: 'id'))
         .map(TaskItem.fromMap)
+        .toList();
+    seserahanItems = (await _db.queryAll('seserahan_items', orderBy: 'id'))
+        .map(SeserahanItem.fromMap)
         .toList();
   }
 
@@ -100,6 +120,9 @@ class AppState extends ChangeNotifier {
   int get balance => totalIncome - totalSpent;
   int get totalBudget => categories.fold<int>(0, (sum, c) => sum + c.budget);
 
+  /// Sisa target dana yang belum dialokasikan ke anggaran kategori.
+  int get unallocatedTarget => profile.targetAmount - totalBudget;
+
   int get remainingTarget => math.max(0, profile.targetAmount - totalIncome);
 
   double get savingProgress => profile.targetAmount <= 0
@@ -138,6 +161,13 @@ class AppState extends ChangeNotifier {
 
   int get tasksDone => tasks.where((t) => t.done).length;
 
+  int get totalSeserahanEstimated =>
+      seserahanItems.fold<int>(0, (s, i) => s + i.estimatedPrice);
+  int get totalSeserahanActual =>
+      seserahanItems.fold<int>(0, (s, i) => s + i.actualPrice);
+  int get seserahanBoughtCount =>
+      seserahanItems.where((i) => i.bought).length;
+
   /// Sisa hari menuju hari H (negatif jika sudah lewat).
   int? get daysToWedding {
     final d = profile.weddingDate;
@@ -158,8 +188,38 @@ class AppState extends ChangeNotifier {
     return (remainingTarget / months).ceil();
   }
 
+  /// Menghitung rekomendasi anggaran tiap kategori dari [totalAmount].
+  Map<int, int> calculateRecommendedBudgets(int totalAmount) {
+    if (categories.isEmpty || totalAmount <= 0) return {};
+    final weights = <int, int>{};
+    var weightSum = 0;
+    for (final c in categories) {
+      final w = defaultCategoryWeights[c.iconKey] ?? 4;
+      weights[c.id!] = w;
+      weightSum += w;
+    }
+    if (weightSum <= 0) return {};
+    final result = <int, int>{};
+    var allocated = 0;
+    for (var i = 0; i < categories.length; i++) {
+      final c = categories[i];
+      if (i == categories.length - 1) {
+        result[c.id!] = math.max(0, totalAmount - allocated);
+      } else {
+        final raw = (totalAmount * (weights[c.id!] ?? 4)) / weightSum;
+        // Bulatkan ke kelipatan Rp 50.000 terdekat agar rapi
+        final rounded = totalAmount >= 1000000
+            ? ((raw / 50000).round() * 50000)
+            : raw.round();
+        result[c.id!] = rounded;
+        allocated += rounded;
+      }
+    }
+    return result;
+  }
+
   // ---------------------------------------------------------------------------
-  // Profil
+  // Profil & Backup
   // ---------------------------------------------------------------------------
 
   Future<void> saveProfile(WeddingProfile p,
@@ -175,6 +235,21 @@ class AppState extends ChangeNotifier {
             'contributors', c.copyWith(name: names[i]).toMap(), c.id!);
       }
     }
+    await _afterChange();
+  }
+
+  Future<String> exportBackupJson() async {
+    final map = await _db.exportAllData();
+    return const JsonEncoder.withIndent('  ').convert(map);
+  }
+
+  Future<void> importBackupJson(String rawJson) async {
+    final decoded = jsonDecode(rawJson);
+    if (decoded is! Map) {
+      throw const FormatException('Format data backup tidak dikenali.');
+    }
+    await _db.importAllData(Map<String, Object?>.from(decoded));
+    profile = WeddingProfile.fromSettings(await _db.loadSettings());
     await _afterChange();
   }
 
@@ -216,6 +291,21 @@ class AppState extends ChangeNotifier {
       await _db.insert('categories', c.toMap());
     } else {
       await _db.update('categories', c.toMap(), c.id!);
+    }
+    await _afterChange();
+  }
+
+  /// Simpan anggaran banyak kategori sekaligus (misal dari fitur bagi otomatis).
+  Future<void> saveCategoryBudgets(Map<int, int> budgets) async {
+    for (final c in categories) {
+      final newBudget = budgets[c.id];
+      if (newBudget != null && c.id != null) {
+        await _db.update(
+          'categories',
+          c.copyWith(budget: newBudget).toMap(),
+          c.id!,
+        );
+      }
     }
     await _afterChange();
   }
@@ -311,6 +401,37 @@ class AppState extends ChangeNotifier {
 
   Future<void> deleteTask(int id) async {
     await _db.delete('tasks', id);
+    await _afterChange();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Seserahan & Mahar
+  // ---------------------------------------------------------------------------
+
+  Future<void> saveSeserahanItem(SeserahanItem item) async {
+    if (item.id == null) {
+      await _db.insert('seserahan_items', item.toMap());
+    } else {
+      await _db.update('seserahan_items', item.toMap(), item.id!);
+    }
+    await _afterChange();
+  }
+
+  Future<void> toggleSeserahanBought(SeserahanItem item) async {
+    final nextBought = !item.bought;
+    final nextActual = (nextBought && item.actualPrice <= 0)
+        ? item.estimatedPrice
+        : item.actualPrice;
+    await _db.update(
+      'seserahan_items',
+      item.copyWith(bought: nextBought, actualPrice: nextActual).toMap(),
+      item.id!,
+    );
+    await _afterChange();
+  }
+
+  Future<void> deleteSeserahanItem(int id) async {
+    await _db.delete('seserahan_items', id);
     await _afterChange();
   }
 

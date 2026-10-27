@@ -7,7 +7,7 @@ import 'package:sqflite/sqflite.dart';
 /// sinkronisasi online (misalnya Firebase) tanpa mengubah UI.
 class AppDatabase {
   static const _fileName = 'dana_nikah.db';
-  static const _version = 1;
+  static const _version = 2;
 
   static const List<String> _tables = [
     'settings',
@@ -17,6 +17,7 @@ class AppDatabase {
     'vendors',
     'payments',
     'tasks',
+    'seserahan_items',
   ];
 
   static const List<List<String>> _defaultCategories = [
@@ -55,6 +56,17 @@ class AppDatabase {
     'Technical meeting dengan semua vendor',
   ];
 
+  static const List<List<String>> _defaultSeserahan = [
+    ['Cincin Nikah Sepasang', 'Mahar'],
+    ['Seperangkat Alat Sholat / Kitab Suci', 'Mahar'],
+    ['Uang Tunai / Logam Mulia Mahar', 'Mahar'],
+    ['Set Skincare & Kosmetik', 'Seserahan'],
+    ['Tas & Sepatu Pesta', 'Seserahan'],
+    ['Pakaian / Kain Kebaya', 'Seserahan'],
+    ['Perlengkapan Mandi & Parfum', 'Seserahan'],
+    ['Buah-buahan & Kue Hantaran', 'Seserahan'],
+  ];
+
   Database? _db;
 
   Future<Database> get database async => _db ??= await _open();
@@ -68,7 +80,41 @@ class AppDatabase {
         await _createSchema(db);
         await _seed(db);
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createSeserahanTable(db);
+          await _seedSeserahan(db);
+        }
+      },
     );
+  }
+
+  Future<void> _createSeserahanTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS seserahan_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        item_type TEXT NOT NULL DEFAULT 'Seserahan',
+        estimated_price INTEGER NOT NULL DEFAULT 0,
+        actual_price INTEGER NOT NULL DEFAULT 0,
+        bought INTEGER NOT NULL DEFAULT 0,
+        note TEXT NOT NULL DEFAULT ''
+      )''');
+  }
+
+  Future<void> _seedSeserahan(DatabaseExecutor db) async {
+    final existing = await db.query('seserahan_items', limit: 1);
+    if (existing.isNotEmpty) return;
+    for (final item in _defaultSeserahan) {
+      await db.insert('seserahan_items', {
+        'name': item[0],
+        'item_type': item[1],
+        'estimated_price': 0,
+        'actual_price': 0,
+        'bought': 0,
+        'note': '',
+      });
+    }
   }
 
   Future<void> _createSchema(Database db) async {
@@ -125,6 +171,7 @@ class AppDatabase {
         category_id INTEGER,
         note TEXT NOT NULL DEFAULT ''
       )''');
+    await _createSeserahanTable(db);
   }
 
   Future<void> _seed(DatabaseExecutor db) async {
@@ -145,6 +192,7 @@ class AppDatabase {
     for (final title in _defaultTasks) {
       await db.insert('tasks', {'title': title, 'done': 0});
     }
+    await _seedSeserahan(db);
   }
 
   // ---------------------------------------------------------------------------
@@ -202,6 +250,47 @@ class AppDatabase {
   Future<void> execute(String sql, [List<Object?>? args]) async {
     final db = await database;
     await db.execute(sql, args);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Backup & Restore
+  // ---------------------------------------------------------------------------
+
+  Future<Map<String, Object?>> exportAllData() async {
+    final db = await database;
+    final data = <String, Object?>{
+      'app': 'dana_nikah',
+      'version': _version,
+      'exported_at': DateTime.now().toIso8601String(),
+    };
+    for (final t in _tables) {
+      data[t] = await db.query(t);
+    }
+    return data;
+  }
+
+  Future<void> importAllData(Map<String, Object?> payload) async {
+    if (payload['app'] != 'dana_nikah') {
+      throw const FormatException('Bukan file backup Dana Nikah yang valid.');
+    }
+    final db = await database;
+    await db.transaction((txn) async {
+      for (final t in _tables) {
+        await txn.delete(t);
+        final rows = payload[t];
+        if (rows is List) {
+          for (final item in rows) {
+            if (item is Map) {
+              await txn.insert(
+                t,
+                Map<String, Object?>.from(item),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+          }
+        }
+      }
+    });
   }
 
   /// Hapus semua data lalu isi ulang data bawaan.

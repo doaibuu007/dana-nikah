@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
 import '../models/models.dart';
 import '../theme.dart';
+import '../utils/exporter.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
+import 'catering_calculator_screen.dart';
 import 'profile_form_screen.dart';
+import 'seserahan_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -150,6 +154,111 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _backupData(BuildContext context, AppState s) async {
+    final jsonText = await s.exportBackupJson();
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Backup Data'),
+        content: const Text(
+          'Salin kode backup ini lalu simpan di catatan / Google Keep atau '
+          'kirim ke WhatsApp pasangan. Kode ini bisa dipakai untuk '
+          'memulihkan (restore) seluruh data di HP ini atau HP lain.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              shareViaWhatsapp(context, jsonText);
+            },
+            icon: const Icon(Icons.chat, size: 18),
+            label: const Text('Kirim WA'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              copyToClipboard(
+                context,
+                jsonText,
+                'Data backup disalin! Simpan di tempat aman.',
+              );
+            },
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Salin Backup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _restoreData(BuildContext context, AppState s) async {
+    final controller = TextEditingController();
+    final clip = await Clipboard.getData(Clipboard.kTextPlain);
+    if (clip?.text != null && clip!.text!.contains('"dana_nikah"')) {
+      controller.text = clip.text!;
+    }
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore Data dari Backup'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tempel (paste) kode JSON backup di bawah ini. '
+              'Perhatian: Data saat ini akan digantikan oleh data dari backup.',
+              style: TextStyle(fontSize: 13, color: AppColors.muted),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: fieldDecoration(
+                'Kode Backup JSON',
+                hint: '{"app": "dana_nikah", ...}',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Pulihkan Data'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    final raw = controller.text.trim();
+    if (raw.isEmpty) {
+      showSnack(context, 'Kode backup masih kosong');
+      return;
+    }
+    try {
+      await s.importBackupJson(raw);
+      if (context.mounted) {
+        showSnack(context, 'Data berhasil dipulihkan dari backup! 🎉');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showSnack(context, 'Gagal restore: Pastikan kode backup lengkap & valid.');
+      }
+    }
+  }
+
   Future<void> _reset(BuildContext context, AppState s) async {
     final ok = await confirmDialog(
       context,
@@ -197,6 +306,34 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => pushPage(context, const ProfileFormScreen()),
             ),
           ),
+          const SectionHeader('Alat Bantu Perencanaan'),
+          AppCard(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.restaurant_menu,
+                      color: AppColors.rose),
+                  title: const Text('Kalkulator Tamu & Porsi Katering'),
+                  subtitle: const Text(
+                      'Hitung estimasi tamu, porsi prasmanan vs gubukan & biaya'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () =>
+                      pushPage(context, const CateringCalculatorScreen()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.card_giftcard,
+                      color: AppColors.rose),
+                  title: const Text('Rincian Barang Seserahan & Mahar'),
+                  subtitle: Text(
+                      '${s.seserahanBoughtCount}/${s.seserahanItems.length} barang sudah dibeli'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => pushPage(context, const SeserahanScreen()),
+                ),
+              ],
+            ),
+          ),
           SectionHeader(
             'Penyetor Dana',
             trailing: TextButton.icon(
@@ -221,7 +358,8 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     title: Text(c.name),
-                    subtitle: Text('Total setoran ${rupiah(s.incomeOf(c.id!))}'),
+                    subtitle:
+                        Text('Total setoran ${rupiah(s.incomeOf(c.id!))}'),
                     trailing: const Icon(Icons.edit_outlined, size: 20),
                     onTap: () => _editContributor(context, s, c),
                   ),
@@ -276,17 +414,40 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SectionHeader('Data'),
+          const SectionHeader('Backup, Export & Data'),
           AppCard(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('Penyimpanan offline'),
-                  subtitle: Text(
-                      'Semua data tersimpan di HP ini. Menghapus aplikasi '
-                      'akan menghapus datanya juga.'),
+                ListTile(
+                  leading:
+                      const Icon(Icons.cloud_upload_outlined, color: AppColors.rose),
+                  title: const Text('Backup Data (Salin / Kirim WA)'),
+                  subtitle: const Text(
+                      'Amankan semua data atau kirim ke HP pasangan'),
+                  onTap: () => _backupData(context, s),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.cloud_download_outlined,
+                      color: AppColors.success),
+                  title: const Text('Restore Data dari Backup'),
+                  subtitle: const Text(
+                      'Pulihkan data dari kode backup yang pernah disimpan'),
+                  onTap: () => _restoreData(context, s),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.table_chart_outlined,
+                      color: AppColors.gold),
+                  title: const Text('Export Tabel CSV (Excel / Sheets)'),
+                  subtitle: const Text(
+                      'Salin semua transaksi dalam format CSV'),
+                  onTap: () => copyToClipboard(
+                    context,
+                    buildCsvExport(s),
+                    'Data CSV disalin! Tempel ke Excel / Google Sheets.',
+                  ),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -301,7 +462,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Center(
-            child: Text('Dana Nikah v1.0.0 • Dibuat dengan 💗',
+            child: Text('Dana Nikah v1.1.0 • Dibuat dengan 💗',
                 style: TextStyle(fontSize: 12, color: AppColors.muted)),
           ),
         ],

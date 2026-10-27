@@ -6,15 +6,41 @@ import '../models/models.dart';
 import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
+import 'seserahan_screen.dart';
 import 'task_form_screen.dart';
 
-class ChecklistScreen extends StatelessWidget {
+class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
+
+  @override
+  State<ChecklistScreen> createState() => _ChecklistScreenState();
+}
+
+class _ChecklistScreenState extends State<ChecklistScreen> {
+  String _query = '';
+  int? _categoryFilter;
 
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
-    final pending = s.tasks.where((t) => !t.done).toList()
+    final q = _query.trim().toLowerCase();
+
+    final filtered = s.tasks.where((t) {
+      if (_categoryFilter != null && t.categoryId != _categoryFilter) {
+        return false;
+      }
+      if (q.isNotEmpty) {
+        final catName =
+            s.categoryById(t.categoryId)?.name.toLowerCase() ?? '';
+        final match = t.title.toLowerCase().contains(q) ||
+            t.note.toLowerCase().contains(q) ||
+            catName.contains(q);
+        if (!match) return false;
+      }
+      return true;
+    }).toList();
+
+    final pending = filtered.where((t) => !t.done).toList()
       ..sort((a, b) {
         final ad = a.dueDate;
         final bd = b.dueDate;
@@ -23,13 +49,21 @@ class ChecklistScreen extends StatelessWidget {
         if (bd == null) return -1;
         return ad.compareTo(bd);
       });
-    final done = s.tasks.where((t) => t.done).toList();
-    final total = s.tasks.length;
+    final done = filtered.where((t) => t.done).toList();
+    final totalAll = s.tasks.length;
+    final doneAll = s.tasksDone;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Checklist',
             style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: [
+          IconButton(
+            tooltip: 'Rincian Seserahan & Mahar',
+            icon: const Icon(Icons.card_giftcard_outlined),
+            onPressed: () => pushPage(context, const SeserahanScreen()),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => pushPage(context, const TaskFormScreen()),
@@ -50,24 +84,63 @@ class ChecklistScreen extends StatelessWidget {
                           style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
                     Text(
-                      '${done.length}/$total selesai',
+                      '$doneAll/$totalAll selesai',
                       style: const TextStyle(color: AppColors.muted),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 RoundedProgress(
-                  value: total == 0 ? 0 : done.length / total,
+                  value: totalAll == 0 ? 0 : doneAll / totalAll,
                   color: AppColors.success,
                 ),
               ],
             ),
           ),
-          if (total == 0)
-            const EmptyState(
+          SearchBarField(
+            hint: 'Cari tugas persiapan...',
+            value: _query,
+            onChanged: (v) => setState(() => _query = v),
+          ),
+          if (s.categories.any((c) =>
+              s.tasks.any((t) => t.categoryId == c.id))) ...[
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: const Text('Semua Kategori'),
+                      selected: _categoryFilter == null,
+                      onSelected: (_) =>
+                          setState(() => _categoryFilter = null),
+                    ),
+                  ),
+                  for (final c in s.categories)
+                    if (s.tasks.any((t) => t.categoryId == c.id))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(c.name),
+                          selected: _categoryFilter == c.id,
+                          onSelected: (sel) => setState(
+                              () => _categoryFilter = sel ? c.id : null),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 4),
+          if (filtered.isEmpty)
+            EmptyState(
               icon: Icons.fact_check_outlined,
-              title: 'Checklist kosong',
-              message: 'Tambahkan daftar hal yang perlu disiapkan.',
+              title: totalAll == 0 ? 'Checklist kosong' : 'Tidak ditemukan',
+              message: totalAll == 0
+                  ? 'Tambahkan daftar hal yang perlu disiapkan.'
+                  : 'Tidak ada tugas yang cocok dengan pencarian.',
             ),
           if (pending.isNotEmpty) ...[
             SectionHeader('Belum selesai (${pending.length})'),

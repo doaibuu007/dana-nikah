@@ -313,12 +313,14 @@ class MoneyField extends StatelessWidget {
     required this.label,
     this.required = true,
     this.helperText,
+    this.onChanged,
   });
 
   final TextEditingController controller;
   final String label;
   final bool required;
   final String? helperText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -326,6 +328,7 @@ class MoneyField extends StatelessWidget {
       controller: controller,
       keyboardType: TextInputType.number,
       inputFormatters: [ThousandsFormatter()],
+      onChanged: onChanged,
       decoration: fieldDecoration(
         label,
         icon: Icons.payments_outlined,
@@ -336,6 +339,79 @@ class MoneyField extends StatelessWidget {
         if (required && parseAmount(v ?? '') <= 0) return 'Masukkan nominal';
         return null;
       },
+    );
+  }
+}
+
+/// Kolom pencarian dengan tombol hapus cepat.
+class SearchBarField extends StatefulWidget {
+  const SearchBarField({
+    super.key,
+    required this.hint,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String hint;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<SearchBarField> createState() => _SearchBarFieldState();
+}
+
+class _SearchBarFieldState extends State<SearchBarField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchBarField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != _controller.text) {
+      _controller.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      onChanged: widget.onChanged,
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: widget.value.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Bersihkan',
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  _controller.clear();
+                  FocusScope.of(context).unfocus();
+                  widget.onChanged('');
+                },
+              ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+      ),
     );
   }
 }

@@ -9,7 +9,9 @@ import '../utils/format.dart';
 import '../widgets/common.dart';
 import '../widgets/tiles.dart';
 import 'category_form_screen.dart';
+import 'catering_calculator_screen.dart';
 import 'payment_form_screen.dart';
+import 'seserahan_screen.dart';
 
 class CategoryDetailScreen extends StatelessWidget {
   const CategoryDetailScreen({super.key, required this.categoryId});
@@ -51,6 +53,12 @@ class CategoryDetailScreen extends StatelessWidget {
     final remaining = c.budget - spent;
     final payments = s.payments.where((p) => p.categoryId == categoryId);
     final vendors = s.vendors.where((v) => v.categoryId == categoryId);
+    final isCatering =
+        c.iconKey == 'catering' || c.name.toLowerCase().contains('katering');
+    final isMahar =
+        c.iconKey == 'ring' || c.name.toLowerCase().contains('mahar');
+    final isSeserahan =
+        c.iconKey == 'gift' || c.name.toLowerCase().contains('seserahan');
 
     return Scaffold(
       appBar: AppBar(
@@ -113,6 +121,35 @@ class CategoryDetailScreen extends StatelessWidget {
                   RoundedProgress(
                     value: spent / c.budget,
                     color: remaining < 0 ? AppColors.danger : AppColors.rose,
+                  ),
+                ],
+                if (isCatering) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () =>
+                          pushPage(context, const CateringCalculatorScreen()),
+                      icon: const Icon(Icons.calculate_outlined),
+                      label: const Text('Buka Kalkulator Tamu & Porsi Katering'),
+                    ),
+                  ),
+                ],
+                if (isMahar || isSeserahan) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => pushPage(
+                        context,
+                        SeserahanScreen(
+                            initialType: isMahar ? 'Mahar' : 'Seserahan'),
+                      ),
+                      icon: const Icon(Icons.card_giftcard_outlined),
+                      label: Text(isMahar
+                          ? 'Lihat Rincian Barang Mahar'
+                          : 'Lihat Rincian Barang Seserahan'),
+                    ),
                   ),
                 ],
               ],

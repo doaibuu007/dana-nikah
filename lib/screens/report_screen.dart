@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
 import '../theme.dart';
+import '../utils/exporter.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 
@@ -26,6 +27,66 @@ class _ReportScreenState extends State<ReportScreen> {
   /// 0 = pengeluaran, 1 = anggaran
   int _mode = 0;
 
+  void _showExportSheet(BuildContext context, AppState s) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Bagikan & Export Laporan',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat, color: AppColors.success),
+              title: const Text('Kirim Ringkasan ke WhatsApp'),
+              subtitle: const Text(
+                  'Kirim laporan progres tabungan & tagihan ke pasangan/keluarga'),
+              onTap: () {
+                Navigator.pop(ctx);
+                shareViaWhatsapp(context, buildWhatsappSummary(s));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy, color: AppColors.rose),
+              title: const Text('Salin Teks Ringkasan'),
+              subtitle: const Text('Salin laporan rapi ke clipboard'),
+              onTap: () {
+                Navigator.pop(ctx);
+                copyToClipboard(
+                  context,
+                  buildWhatsappSummary(s),
+                  'Ringkasan laporan berhasil disalin',
+                );
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.table_chart_outlined, color: AppColors.gold),
+              title: const Text('Salin Data CSV (Excel / Google Sheets)'),
+              subtitle: const Text(
+                  'Salin seluruh tabel transaksi dalam format CSV'),
+              onTap: () {
+                Navigator.pop(ctx);
+                copyToClipboard(
+                  context,
+                  buildCsvExport(s),
+                  'Data CSV disalin! Tempel ke file .csv atau Google Sheets.',
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
@@ -47,10 +108,39 @@ class _ReportScreenState extends State<ReportScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Laporan')),
+      appBar: AppBar(
+        title: const Text('Laporan'),
+        actions: [
+          IconButton(
+            tooltip: 'Bagikan / Export',
+            icon: const Icon(Icons.ios_share),
+            onPressed: () => _showExportSheet(context, s),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: () =>
+                      shareViaWhatsapp(context, buildWhatsappSummary(s)),
+                  icon: const Icon(Icons.chat, size: 18),
+                  label: const Text('Bagikan ke WA'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showExportSheet(context, s),
+                  icon: const Icon(Icons.table_chart_outlined, size: 18),
+                  label: const Text('Export / Salin'),
+                ),
+              ),
+            ],
+          ),
           const SectionHeader('Per Kategori'),
           SegmentedButton<int>(
             segments: const [

@@ -17,15 +17,33 @@ class VendorsScreen extends StatefulWidget {
 }
 
 class _VendorsScreenState extends State<VendorsScreen> {
-  VendorStatus? _filter;
+  VendorStatus? _statusFilter;
+  int? _categoryFilter;
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
-    final filter = _filter;
-    final list = filter == null
-        ? s.vendors
-        : s.vendors.where((v) => s.vendorStatus(v) == filter).toList();
+    final q = _query.trim().toLowerCase();
+
+    final list = s.vendors.where((v) {
+      if (_statusFilter != null && s.vendorStatus(v) != _statusFilter) {
+        return false;
+      }
+      if (_categoryFilter != null && v.categoryId != _categoryFilter) {
+        return false;
+      }
+      if (q.isNotEmpty) {
+        final catName =
+            s.categoryById(v.categoryId)?.name.toLowerCase() ?? '';
+        final match = v.name.toLowerCase().contains(q) ||
+            v.note.toLowerCase().contains(q) ||
+            v.phone.toLowerCase().contains(q) ||
+            catName.contains(q);
+        if (!match) return false;
+      }
+      return true;
+    }).toList();
 
     int countOf(VendorStatus st) =>
         s.vendors.where((v) => s.vendorStatus(v) == st).length;
@@ -68,23 +86,59 @@ class _VendorsScreenState extends State<VendorsScreen> {
               ],
             ),
           ),
+          SearchBarField(
+            hint: 'Cari nama vendor, kategori, atau catatan...',
+            value: _query,
+            onChanged: (v) => setState(() => _query = v),
+          ),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               ChoiceChip(
                 label: Text('Semua (${s.vendors.length})'),
-                selected: _filter == null,
-                onSelected: (_) => setState(() => _filter = null),
+                selected: _statusFilter == null,
+                onSelected: (_) => setState(() => _statusFilter = null),
               ),
               for (final st in VendorStatus.values)
                 ChoiceChip(
                   label: Text('${st.label} (${countOf(st)})'),
-                  selected: _filter == st,
-                  onSelected: (_) => setState(() => _filter = st),
+                  selected: _statusFilter == st,
+                  onSelected: (_) => setState(() => _statusFilter = st),
                 ),
             ],
           ),
+          if (s.categories.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: const Text('Semua Kategori'),
+                      selected: _categoryFilter == null,
+                      onSelected: (_) =>
+                          setState(() => _categoryFilter = null),
+                    ),
+                  ),
+                  for (final c in s.categories)
+                    if (s.vendors.any((v) => v.categoryId == c.id))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(c.name),
+                          selected: _categoryFilter == c.id,
+                          onSelected: (sel) => setState(
+                              () => _categoryFilter = sel ? c.id : null),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           if (list.isEmpty)
             EmptyState(
@@ -93,7 +147,7 @@ class _VendorsScreenState extends State<VendorsScreen> {
               message: s.vendors.isEmpty
                   ? 'Simpan daftar vendor (gedung, katering, MUA, dll) beserta '
                       'kontak dan nilai kontraknya.'
-                  : 'Tidak ada vendor dengan status ini.',
+                  : 'Tidak ada vendor yang cocok dengan filter / pencarian.',
             ),
           for (final v in list) VendorTile(vendor: v),
         ],

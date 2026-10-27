@@ -4,10 +4,13 @@ import 'package:provider/provider.dart';
 import '../data/app_state.dart';
 import '../models/models.dart';
 import '../theme.dart';
+import '../utils/exporter.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
+import 'catering_calculator_screen.dart';
 import 'profile_form_screen.dart';
 import 'report_screen.dart';
+import 'seserahan_screen.dart';
 import 'settings_screen.dart';
 import 'task_form_screen.dart';
 import 'vendor_detail_screen.dart';
@@ -23,6 +26,12 @@ class DashboardScreen extends StatelessWidget {
         title: const Text('Dana Nikah',
             style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [
+          IconButton(
+            tooltip: 'Bagikan ke WhatsApp',
+            icon: const Icon(Icons.share_outlined),
+            onPressed: () =>
+                shareViaWhatsapp(context, buildWhatsappSummary(s)),
+          ),
           IconButton(
             tooltip: 'Laporan',
             icon: const Icon(Icons.pie_chart_outline),
@@ -41,6 +50,7 @@ class DashboardScreen extends StatelessWidget {
           _HeroCard(state: s),
           _FundCard(state: s),
           _StatsRow(state: s),
+          _QuickToolsCard(state: s),
           _BudgetCard(state: s),
           _ContributionCard(state: s),
           _UpcomingCard(state: s),
@@ -296,6 +306,91 @@ class _StatTile extends StatelessWidget {
           IconBox(icon, color: color, size: 32),
           const SizedBox(height: 10),
           MiniStat(label: label, value: value, color: AppColors.ink),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickToolsCard extends StatelessWidget {
+  const _QuickToolsCard({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final bought = state.seserahanBoughtCount;
+    final totalSeserahan = state.seserahanItems.length;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Alat Bantu & Rincian',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () =>
+                      pushPage(context, const CateringCalculatorScreen()),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.roseSoft,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.restaurant_menu,
+                            color: AppColors.rose),
+                        const SizedBox(height: 6),
+                        const Text('Kalkulator Katering',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 13)),
+                        Text(
+                          '${state.profile.invitationCount} undangan',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => pushPage(context, const SeserahanScreen()),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.roseSoft,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.card_giftcard, color: AppColors.rose),
+                        const SizedBox(height: 6),
+                        const Text('Seserahan & Mahar',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 13)),
+                        Text(
+                          '$bought/$totalSeserahan terbeli',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
