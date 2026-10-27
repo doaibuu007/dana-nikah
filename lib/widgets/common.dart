@@ -4,7 +4,23 @@ import '../theme.dart';
 import '../utils/format.dart';
 
 Future<T?> pushPage<T>(BuildContext context, Widget page) =>
-    Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => page));
+    Navigator.of(context).push<T>(
+      MaterialPageRoute(
+        builder: (ctx) {
+          final width = MediaQuery.sizeOf(ctx).width;
+          if (width < 760) return page;
+          return ColoredBox(
+            color: AppColors.cream,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: page,
+              ),
+            ),
+          );
+        },
+      ),
+    );
 
 void showSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)

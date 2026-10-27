@@ -27,7 +27,15 @@ class DanaNikahApp extends StatelessWidget {
       ],
       home: setupDone
           ? const HomeShell()
-          : const ProfileFormScreen(isOnboarding: true),
+          : ColoredBox(
+              color: AppColors.cream,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: const ProfileFormScreen(isOnboarding: true),
+                ),
+              ),
+            ),
     );
   }
 }
